@@ -19,14 +19,17 @@ class FP2MQTT_Sensor:
                     "manufacturer": "Robby" 
                     }
         self.state_topic = "homeassistant/sensor/"+self.dev_name+"/state"
+        self.availability_topic = "homeassistant/sensor/"+self.dev_name+"/availability"
                 
         self.client = MQTTClient(self.dev_name, mqtt['server'])
-
+        self.client.set_last_will(self.availability_topic, 'offline')
+        
         result =  self.client.connect()
         sprint('MQTT connect to server result: {}'.format(result))
 
     def disconnect(self):
         sprint('Disconnecting MQTT client...')
+        self.client.publish(self.availability_topic, 'offline')
         self.client.disconnect()
 
     def reconnect_client(self):
@@ -48,22 +51,7 @@ class FP2MQTT_Sensor:
                 "unit_of_measurement": "°C",
                 "value_template": "{{ value_json.temperature }}",
                 "state_topic": self.state_topic,
-                "unique_id": u_id,
-                "device": self.device_cfg,
-                }
-        config_topic = "homeassistant/sensor/" + u_id + "/config"
-        sprint("Topic: {}".format(config_topic))
-        sprint("Payload: {}".format(dumps(config_payload)))
-        self.client.publish(config_topic, bytes(dumps(config_payload), 'utf-8'))
-
-    def add_battery(self):
-        u_id = "batt_" + self.dev_name
-        config_payload = {
-                "name": "Battery",
-                "device_class": "voltage",
-                "unit_of_measurement": "V",
-                "value_template": "{{ value_json.battery }}",
-                "state_topic": self.state_topic,
+                "availability_topic": self.availability_topic,
                 "unique_id": u_id,
                 "device": self.device_cfg,
                 }
@@ -78,4 +66,5 @@ class FP2MQTT_Sensor:
             }
         sprint("Topic: {}".format(self.state_topic))
         sprint("Payload: {}".format((payload)))
+        self.client.publish(self.availability_topic, 'online')
         self.client.publish(self.state_topic, bytes(dumps(payload), 'utf-8'))
