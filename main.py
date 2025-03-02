@@ -13,8 +13,9 @@ from secret import wifi
 DS18B20_PIN = machine.Pin(20)
 PWR_PIN = machine.Pin(22, machine.Pin.OUT)
 WIFI_RETRIES= DS18B20_RETRIES = 10
-SLEEP_MINS = 1
-PWR_BANK_SECS = 15
+SLEEP_MINS = 10
+PWR_BANK_SECS = 15  #  Make sure a factor of 60 secs
+PWR_BANK_PULSE_SECS = 0.5
 PWR_BANK_PIN = machine.Pin(15, machine.Pin.OUT)
 LED_PIN = machine.Pin("LED", machine.Pin.OUT)
 
@@ -24,10 +25,11 @@ def my_sleep() -> None:
     while count > 0:
         sprint("Counting down: {}".format(count))
         count -= 1
-        time.sleep(PWR_BANK_SECS - 1)
-        LED_PIN.on()
+        time.sleep(PWR_BANK_SECS - PWR_BANK_PULSE_SECS)
+        
         PWR_BANK_PIN.on()
-        time.sleep(1)
+        LED_PIN.on()
+        time.sleep(PWR_BANK_PULSE_SECS)
         LED_PIN.off()
         PWR_BANK_PIN.off()
 
