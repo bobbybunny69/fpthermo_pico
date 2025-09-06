@@ -60,9 +60,27 @@ class FP2MQTT_Sensor:
         sprint("Payload: {}".format(dumps(config_payload)))
         self.client.publish(config_topic, bytes(dumps(config_payload), 'utf-8'), retain=True)
 
-    def publish_state(self, temperature):
+    def add_battery(self):
+        u_id = "batt_" + self.dev_name
+        config_payload = {
+                "name": "Battery",
+                "device_class": "voltage",
+                "unit_of_measurement": "V",
+                "value_template": "{{ value_json.battery }}",
+                "state_topic": self.state_topic,
+                "availability_topic": self.availability_topic,
+                "unique_id": u_id,
+                "device": self.device_cfg,
+                }
+        config_topic = "homeassistant/sensor/" + u_id + "/config"
+        sprint("Topic: {}".format(config_topic))
+        sprint("Payload: {}".format(dumps(config_payload)))
+        self.client.publish(config_topic, bytes(dumps(config_payload), 'utf-8'))
+
+    def publish_state(self, temperature, vbatt):
         payload = {
             "temperature": "{:.1f}".format(temperature),
+            "battery": "{:.2f}".format(vbatt), 
             }
         sprint("Topic: {}".format(self.state_topic))
         sprint("Payload: {}".format((payload)))
