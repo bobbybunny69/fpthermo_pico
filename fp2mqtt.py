@@ -58,7 +58,7 @@ class FP2MQTT_Sensor:
         config_topic = "homeassistant/sensor/" + u_id + "/config"
         sprint("Topic: {}".format(config_topic))
         sprint("Payload: {}".format(dumps(config_payload)))
-        self.client.publish(config_topic, bytes(dumps(config_payload), 'utf-8'), retain=True)
+        self.client.publish(config_topic, bytes(dumps(config_payload), 'utf-8'))
 
     def add_battery(self):
         u_id = "batt_" + self.dev_name
