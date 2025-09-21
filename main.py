@@ -1,46 +1,34 @@
 """
 Fishpond thermometer for HASS using MQTT
 """
-import time
-import network
 import machine
+from secret import wifi, dbg_svr
+from lpfwk import LPFWK
 from ds18x20 import DS18X20
 from onewire import OneWire
 from fp2mqtt import FP2MQTT_Sensor
-from log import sprint
-from secret import wifi
 import gc
-
-# ----------------------------------
-# Watchdog enable
-# set to True in Production
-# set to False in Development
-# Upload with 8.3s to stop continual resets
-WATCHDOG_ENABLE=False
-# ----------------------------------
-WATCHDOG_KICK_PERIOD_SECS = 5 # Note: must be less than 8.3s as this is max Pico supports
-
 
 DS18B20_PIN = machine.Pin(20)
 PWR_PIN = machine.Pin(22, machine.Pin.OUT)
 WIFI_RETRIES= DS18B20_RETRIES = 10
-SLEEP_SECS = 120
+SLEEP_SECS = 600
 LED_PIN = machine.Pin("LED", machine.Pin.OUT)
 
 def get_temperature() -> None | float:
     #Setup the DS18B20 data line and read ROMS
     PWR_PIN.on()
-    time.sleep(0.2)
+    lpf.sleep_ms(200)
     ds_bus = DS18X20(OneWire(DS18B20_PIN))
     roms = ds_bus.scan()
-    sprint("Found DS devices: {}".format(roms))
+    lpf.print("Found DS devices: {}".format(roms))
     ds_bus.convert_temp()
-    time.sleep(0.75)
+    lpf.sleep_ms(750)
     reading = ds_bus.read_temp(roms[0])
     if(reading==None):
-        sprint("Bad CRC reading sensor")
+        lpf.print("Bad CRC reading sensor")
     elif(reading>50.0): 
-        sprint("Suspiscous reading on sensor")
+        lpf.print("Suspiscous reading on sensor")
         reading = None
     PWR_PIN.off()
     return reading
@@ -62,88 +50,59 @@ def get_vbatt() -> None | float:
     raw_value = adc.read_u16()
     conversion_factor = 3.3 / 65535
     voltage = raw_value * 3.0 * conversion_factor
-    sprint("Batt voltage: {}".format(voltage))
+    lpf.print("Batt voltage: {}".format(voltage))
     return voltage
 
-def connect_wifi() -> bool:
-    # Connect to WiFi
-    wlan = network.WLAN(network.STA_IF)
-    wlan.active(True)
-    wlan.connect(wifi['ssid'], wifi['pw'])
-    for i in range(0,WIFI_RETRIES):
-        if WATCHDOG_ENABLE == True:
-            wdt.feed()
-        LED_PIN.on()
-        time.sleep(0.1)
-        sprint('Waiting for connection...')
-        LED_PIN.off()
-        time.sleep(0.9)
-        if wlan.isconnected():
-            ip_addr = wlan.ifconfig()[0]
-            sprint("Connected to Wi-Fi. My IP Address: {}".format(ip_addr))
-            break
-    return wlan.isconnected()
+VBUS_PIN = machine.Pin("WL_GPIO2", machine.Pin.IN)
+"""
+NOTE Use VBUS pin to detect USB connection and selecte between
+    Developer mode or Mission mode
+"""
+if VBUS_PIN.value():
+    lpf = LPFWK(dbg_svr['ip'], dbg_svr['port'], dev_mode=True)  # Disable WD if running from USB
+    lpf.print("Running from USB power")
+else:
+    lpf = LPFWK(dbg_svr['ip'], dbg_svr['port'], dev_mode=False)
+    lpf.print("Running from VSYS")
 
-def disconnect_wifi():
-        wlan = network.WLAN(network.STA_IF) # Get the interface object again
-        wlan.active(False) # Disconnect and deactivate the Wi-Fi chip
-        sprint("Wi-Fi disconnected.")
-
-def my_sleep():
-    counter = SLEEP_SECS / WATCHDOG_KICK_PERIOD_SECS
-    while(counter>0):
-        if WATCHDOG_ENABLE == True:
-            wdt.feed()
-        time.sleep(WATCHDOG_KICK_PERIOD_SECS)
-        print("Kick {}".format(counter))
-        counter-=1
-    if WATCHDOG_ENABLE == True:
-        wdt.feed()
-
-if WATCHDOG_ENABLE == True:
-    print("Enabling Watchdog")
-    wdt = machine.WDT(timeout=8300)
 uid = machine.unique_id()
 uid = '{:02x}{:02x}'.format(uid[2],uid[3])
 fp_mqtt_sensor = None
+wifi_isconnected = False
 
 while True:
     voltage = get_vbatt()
     gc.collect()
-    sprint("Memory free: {}".format(gc.mem_free()))
-    if connect_wifi()==False:
-        sprint("Unable to connect to Wi-Fi - Sleeping")
-        my_sleep()
-        continue
+    lpf.print("Memory free: {}".format(gc.mem_free()))
+    # Connect to WiFi
+    if not wifi_isconnected:
+        wifi_isconnected = lpf.connect_wifi(wifi['ssid'], wifi['pw'])
     
-    if fp_mqtt_sensor == None:
+    if fp_mqtt_sensor == None and wifi_isconnected:
         #Setup the MQTT client sensor for HASS for fp_thermo and unique id
-        sprint("Setting up MQTT client")
+        lpf.print("Setting up MQTT client")
         try:
-            fp_mqtt_sensor = FP2MQTT_Sensor("fp_thermo", uid)
+            fp_mqtt_sensor = FP2MQTT_Sensor("fp_thermo", uid, lpf)
+            fp_mqtt_sensor.add_temperature()
+            fp_mqtt_sensor.add_battery()
+            lpf.print("Sensors setup and added")
         except Exception as e:
-            sprint("Failed to connect MQTT: {}".format(e))
-            disconnect_wifi()
-            my_sleep()
-            continue
-        fp_mqtt_sensor.add_temperature()
-        fp_mqtt_sensor.add_battery()
-        sprint("Sensors setup and added")
+            lpf.print("Failed to connect MQTT: {}".format(e))
 
     try:
         reading = get_temperature()
         if(reading==None):
-            sprint("Reading failed on sensor")
+            lpf.print("Reading failed on sensor")
             reading = 0.0
         else:
-            sprint("Temperature: {}".format(reading))
+            lpf.print("Temperature: {}".format(reading))
     except Exception as e:
-        sprint("Reading failed on sensor {}".format(e))
+        lpf.print("Reading failed on sensor {}".format(e))
         reading = 0.0
 
-    fp_mqtt_sensor.publish_state(reading, voltage)
-    time.sleep(1)
-    if WATCHDOG_ENABLE == True:
-        wdt.feed()
-    disconnect_wifi()
-    my_sleep()
+    if fp_mqtt_sensor != None and wifi_isconnected:
+        fp_mqtt_sensor.publish_state(reading, voltage)
+    
+    lpf.disconnect_wifi()
+    wifi_isconnected = False
+    lpf.deep_sleep(SLEEP_SECS)
