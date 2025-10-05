@@ -32,7 +32,7 @@ class FP2MQTT_Sensor:
         
     def disconnect(self):
         self.lpf.print('Disconnecting MQTT client...')
-        self.client.publish(self.availability_topic, 'offline')
+        #self.client.publish(self.availability_topic, 'offline')
         self.client.disconnect()
 
     def reconnect_client(self):
@@ -88,9 +88,11 @@ class FP2MQTT_Sensor:
         
         result = self.client.connect()
         self.lpf.print('MQTT connect to server result: {}'.format(result))
-
+        
+        self.lpf.print("Topic: {}".format(self.availability_topic))
+        self.lpf.print("Payload: '{}'".format(('online')))
+        self.client.publish(self.availability_topic, 'online')
+        
         self.lpf.print("Topic: {}".format(self.state_topic))
         self.lpf.print("Payload: {}".format((payload)))
-        
-        self.client.publish(self.availability_topic, 'online')
         self.client.publish(self.state_topic, bytes(dumps(payload), 'utf-8'))

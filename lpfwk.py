@@ -46,26 +46,30 @@ class LPFWK:
                 self.print("Connected to Wi-Fi. My IP Address: {}".format(ip_addr))
                 try:
                     self.socket = socket(AF_INET, SOCK_STREAM)
+                    self.socket.settimeout(3)
                     self.socket.connect((self.dbg_svr_ip, self.dbg_svr_port))
                 except OSError:
                     self.print("Socket connect error:  is server running?")
-                    return False
+                    return True   #  Becasue Wi-Fi is connected to get here
                 self.print("Socket connected - starting CONN/ACK sequence")
                 self.socket.send("CONN")
-                resp = self.socket.recv(3)
-                self.print("RESP:  {}".format(resp))
-                if resp == b'ACK':
-                    self.socket_isconnected = True
-                    time_sent = self.socket.recv(1025)
-                    self.set_rtc(bytearray(time_sent))
-                return True
+                try:
+                    resp = self.socket.recv(3)
+                    self.print("RESP:  {}".format(resp))
+                    if resp == b'ACK':
+                        self.socket_isconnected = True
+                        time_sent = self.socket.recv(1025)
+                        self.set_rtc(bytearray(time_sent))
+                except:
+                    self.print("No ACK received - timeout")
+                return True   #  Becasue Wi-Fi is connected to get here
         return False
     
     def disconnect_wifi(self):
         if self.socket_isconnected:
             self.print("Closing socket...")
-            self.sleep_ms(250)  # Pause to flush buffer at far end
             self.socket.send('^A')
+            self.sleep_ms(250)  # Pause to flush buffer at far end
             self.socket.close()
             self.socket_isconnected = False
         self.sleep_ms(1000)      
@@ -87,7 +91,7 @@ class LPFWK:
         file.close()
         if self.socket_isconnected:
             file = open(FILENAME, 'r')
-            while line:= file.readline():
+            for line in file.readlines():
                 self.socket.send(line)
             file.close()
             file = open(FILENAME, 'w')  # All lines sent so blank file
@@ -108,9 +112,10 @@ class LPFWK:
             time.sleep_ms(sleep_ms)
             
     def deep_sleep(self, sleep_secs):
-        self.wlan.deinit()
         sleep_ms = sleep_secs * 1000
         if self.dev_mode == False:
+            self.print("Sleeping for {} minutes".format(sleep_secs))
+            self.wlan.deinit()   # Need to deactivate WF to get into low-power state
             self.wdt.feed()
             while sleep_ms > 0:
                 if sleep_ms >= self.timeout_ms:
@@ -121,6 +126,7 @@ class LPFWK:
                     sleep_ms = 0
                 self.wdt.feed()
         else:
+            self.print("Dev mode so sleep for 1 minute")
             time.sleep_ms(60000)
 
     def set_rtc(self, time_bytes:bytearray):

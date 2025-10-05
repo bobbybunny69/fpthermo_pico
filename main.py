@@ -102,6 +102,7 @@ while True:
 
     if fp_mqtt_sensor != None and wifi_isconnected:
         fp_mqtt_sensor.publish_state(reading, voltage)
+        fp_mqtt_sensor.disconnect()
     
     lpf.disconnect_wifi()
     wifi_isconnected = False
