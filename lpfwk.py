@@ -114,7 +114,7 @@ class LPFWK:
     def deep_sleep(self, sleep_secs):
         sleep_ms = sleep_secs * 1000
         if self.dev_mode == False:
-            self.print("Sleeping for {} minutes".format(sleep_secs))
+            self.print("Sleeping for {} secs".format(sleep_secs))
             self.wlan.deinit()   # Need to deactivate WF to get into low-power state
             self.wdt.feed()
             while sleep_ms > 0:
@@ -126,7 +126,7 @@ class LPFWK:
                     sleep_ms = 0
                 self.wdt.feed()
         else:
-            self.print("Dev mode so sleep for 1 minute")
+            self.print("Dev mode so sleeping for 60 secs")
             time.sleep_ms(60000)
 
     def set_rtc(self, time_bytes:bytearray):
