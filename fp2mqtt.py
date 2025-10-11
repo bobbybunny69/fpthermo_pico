@@ -6,8 +6,6 @@ from umqtt.simple import MQTTClient
 from secret import mqtt
 from lpfwk import LPFWK
 
-
-
 class FP2MQTT_Sensor:
     def __init__(self, device_name, uid, lpf:LPFWK):
         self.dev_name = device_name + '_' + uid
@@ -61,7 +59,7 @@ class FP2MQTT_Sensor:
         config_topic = "homeassistant/sensor/" + u_id + "/config"
         self.lpf.print("Topic: {}".format(config_topic))
         self.lpf.print("Payload: {}".format(dumps(config_payload)))
-        self.client.publish(config_topic, bytes(dumps(config_payload), 'utf-8'))
+        self.client.publish(config_topic, bytes(dumps(config_payload), 'utf-8',), retain=True)
 
     def add_battery(self):
         u_id = "batt_" + self.dev_name
@@ -78,7 +76,7 @@ class FP2MQTT_Sensor:
         config_topic = "homeassistant/sensor/" + u_id + "/config"
         self.lpf.print("Topic: {}".format(config_topic))
         self.lpf.print("Payload: {}".format(dumps(config_payload)))
-        self.client.publish(config_topic, bytes(dumps(config_payload), 'utf-8'))
+        self.client.publish(config_topic, bytes(dumps(config_payload), 'utf-8'), retain=True)
 
     def publish_state(self, temperature, vbatt):
         payload = {

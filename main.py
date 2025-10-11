@@ -27,6 +27,7 @@ def get_temperature() -> None | float:
     reading = ds_bus.read_temp(roms[0])
     if(reading==None):
         lpf.print("Bad CRC reading sensor")
+        reading = None
     elif(reading>50.0): 
         lpf.print("Suspiscous reading on sensor")
         reading = None
@@ -55,7 +56,7 @@ def get_vbatt() -> None | float:
 
 VBUS_PIN = machine.Pin("WL_GPIO2", machine.Pin.IN)
 """
-NOTE Use VBUS pin to detect USB connection and selecte between
+NOTE Use VBUS pin to detect USB connection and select between
     Developer mode or Mission mode
 """
 if VBUS_PIN.value():
@@ -77,7 +78,7 @@ while True:
     # Connect to WiFi
     if not wifi_isconnected:
         wifi_isconnected = lpf.connect_wifi(wifi['ssid'], wifi['pw'])
-    
+
     if fp_mqtt_sensor == None and wifi_isconnected:
         #Setup the MQTT client sensor for HASS for fp_thermo and unique id
         lpf.print("Setting up MQTT client")
